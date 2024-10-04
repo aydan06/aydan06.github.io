@@ -1,0 +1,48 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+
+
+driver = webdriver.Chrome() 
+driver.get('https://4x.pelicantrading.io/')
+
+try:
+    login = '/html/body/main/div/div/header/div/nav/div/div[2]/ul/li/a'
+    login_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, login))
+    )
+    login_button.click()
+    print("Login button clicked.")
+except TimeoutException:
+    print("Login button not found or not clickable.")
+    driver.quit()
+
+try:
+    email_field_xpath = '//*[@id="EmailAddress"]'
+    password_field_xpath = '//*[@id="Password"]'
+    
+  
+    email_field = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.XPATH, email_field_xpath))
+    )
+    email_field.click()  
+    email_field.send_keys('aydan.baghir@gmail.com')
+
+
+    password_field = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.XPATH, password_field_xpath))
+    )
+    password_field.click()  
+    password_field.send_keys('Pelican123!')
+
+    submit_button_xpath = '/html/body/div/div/div/form/div[2]/div/button'
+    submit_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, submit_button_xpath))
+    )
+    submit_button.click()
+    print("Login form submitted.")
+except TimeoutException:
+    print("Login form or fields not found or login process failed.")
+    driver.quit()
