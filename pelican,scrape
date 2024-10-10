@@ -2,47 +2,88 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, ElementClickInterceptedException
+import pandas as pd
+import os  # Import os to open the file
 
+# Initialize driver and URL
+url = 'https://jobs.co.uk/results?Keyword=&Location=&RadiusMiles=0'
+driver = webdriver.Chrome()
+driver.get(url)
+wait = WebDriverWait(driver, 10)
 
-driver = webdriver.Chrome() 
-driver.get('https://4x.pelicantrading.io/')
+# Maximum number of pages to scrape
+max_pages = 100
 
-try:
-    login = '/html/body/main/div/div/header/div/nav/div/div[2]/ul/li/a'
-    login_button = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.XPATH, login))
-    )
-    login_button.click()
-    print("Login button clicked.")
-except TimeoutException:
-    print("Login button not found or not clickable.")
-    driver.quit()
+# List to store scraped job data
+job_data = []
 
-try:
-    email_field_xpath = '//*[@id="EmailAddress"]'
-    password_field_xpath = '//*[@id="Password"]'
+def extract_data():
+    """Extracts job data from the current page."""
+    jobs = driver.find_elements(By.XPATH, '//*[@id="main-wrapper"]/section[1]/div/div/div/div[2]/div/div/div')
     
-  
-    email_field = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.XPATH, email_field_xpath))
-    )
-    email_field.click()  
-    email_field.send_keys('aydan.baghir@gmail.com')
+    for job in jobs:
+        try:
+            company = job.find_element(By.XPATH, './div[1]/div[2]/div[1]').text
+            job_title = job.find_element(By.XPATH, './div[1]/div[2]/div[2]/h4/a').text
+            location = job.find_element(By.XPATH, './div[1]/div[2]/div[3]').text
+            salary = job.find_element(By.XPATH, './div[1]/div[2]/div[4]').text
+            
+            # Store data in the list as a dictionary
+            job_data.append({
+                'Company': company,
+                'Job Title': job_title,
+                'Location': location,
+                'Salary': salary
+            })
+            
+            print(f"Company: {company}, Job: {job_title}, Location: {location}, Salary: {salary}")
+            
+        except NoSuchElementException:
+            print("Error extracting data.")
 
+# Scrape pages
+for page in range(max_pages):
+    try:
+        extract_data()
+        
+        # Check which "Next" button to click based on page number
+        if page < 10:
+            next_button_xpath = '//*[@id="main-wrapper"]/section[1]/div/div/div/div[3]/div/nav/div/div/ul/li[15]/a'
+        else:
+            next_button_xpath = '//*[@id="main-wrapper"]/section[1]/div/div/div/div[3]/div/nav/div/div/ul/li[17]/a/span[1]'
+        
+        # Wait for the "Next" button to be clickable
+        next_button = wait.until(EC.element_to_be_clickable((By.XPATH, next_button_xpath)))
+        
+        # Scroll the element into view to avoid interception
+        driver.execute_script("arguments[0].scrollIntoView();", next_button)
+        
+        # Try to click the "Next" button
+        try:
+            next_button.click()
+            # Wait for the next page's content to load
+            wait.until(EC.staleness_of(next_button))
+        except ElementClickInterceptedException:
+            print("Next button is not clickable due to overlay. Retrying after waiting.")
+            # Wait and retry if the button is intercepted
+            WebDriverWait(driver, 5).until(EC.element_to_be_clickable(next_button)).click()
+        
+    except (NoSuchElementException, TimeoutException):
+        print("Next button not found or timeout occurred. Stopping...")
+        break
 
-    password_field = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.XPATH, password_field_xpath))
-    )
-    password_field.click()  
-    password_field.send_keys('Pelican123!')
+# Close the browser
+driver.quit()
 
-    submit_button_xpath = '/html/body/div/div/div/form/div[2]/div/button'
-    submit_button = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.XPATH, submit_button_xpath))
-    )
-    submit_button.click()
-    print("Login form submitted.")
-except TimeoutException:
-    print("Login form or fields not found or login process failed.")
-    driver.quit()
+# Convert the scraped data into a pandas DataFrame
+df = pd.DataFrame(job_data)
+
+# Save the data into an Excel file
+excel_file = 'scraped_job_data.xlsx'
+df.to_excel(excel_file, index=False)
+
+print(f"Data has been saved to {excel_file}")
+
+# Automatically open the Excel file after saving (for Windows)
+os.startfile(excel_file)
